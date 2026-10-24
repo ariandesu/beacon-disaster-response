@@ -27,16 +27,13 @@ export default async ({ req, res, log, error }) => {
       error(`Failed to fetch user for admin check: ${err?.message || err}`);
     }
   } else {
-    // Fallback to request body for backwards compatibility if header is missing
-    try {
-      const body = JSON.parse(req.body || '{}');
-      userEmail = body.adminEmail || null;
-    } catch {
-      // Ignore parse errors
-    }
+    return res.json({ success: false, error: 'Authentication required' }, 401);
   }
 
-  const ADMIN_EMAILS = ['admin@beacon.local', 'command@beacon.local'];
+  const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean);
   const isAdmin = userEmail && ADMIN_EMAILS.includes(userEmail.toLowerCase());
 
   if (!isAdmin) {

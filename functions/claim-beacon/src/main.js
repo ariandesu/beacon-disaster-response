@@ -10,7 +10,7 @@ export default async ({ req, res, log, error }) => {
 
   let body = {};
   try {
-    body = JSON.parse(req.body || '{}');
+    body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   } catch (err) {
     return res.json({ success: false, error: 'Invalid JSON body' }, 400);
   }
@@ -21,9 +21,12 @@ export default async ({ req, res, log, error }) => {
     return res.json({ success: false, error: 'Missing beaconId or responderId' }, 400);
   }
 
-  // Caller identity check via x-appwrite-user-id header if present
+  // Caller identity is mandatory; never trust a client-supplied responderId.
   const headerUserId = req.headers['x-appwrite-user-id'] || req.headers['X-Appwrite-User-Id'];
-  if (headerUserId && headerUserId !== responderId) {
+  if (!headerUserId) {
+    return res.json({ success: false, error: 'Authentication required' }, 401);
+  }
+  if (headerUserId !== responderId) {
     return res.json({ success: false, error: 'Unauthorized caller identity' }, 403);
   }
 

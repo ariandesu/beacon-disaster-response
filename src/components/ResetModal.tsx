@@ -1,16 +1,14 @@
 import { useState } from 'react'
-import { databases, functions, APPWRITE_CONFIG } from '../lib/appwrite'
-import { Query } from 'appwrite'
+import { functions, APPWRITE_CONFIG } from '../lib/appwrite'
 
 interface ResetModalProps {
   isOpen: boolean
   onClose: () => void
   isAdmin: boolean
-  userEmail: string | null
   onResetComplete: () => void
 }
 
-export default function ResetModal({ isOpen, onClose, isAdmin, userEmail, onResetComplete }: ResetModalProps) {
+export default function ResetModal({ isOpen, onClose, isAdmin, onResetComplete }: ResetModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmText, setConfirmText] = useState('')
@@ -40,13 +38,10 @@ export default function ResetModal({ isOpen, onClose, isAdmin, userEmail, onRese
 
     try {
       const functionId = import.meta.env.VITE_APPWRITE_FUNCTION_RESET_ID
-      if (functionId && !functionId.startsWith('your-')) {
-        // Pass user email for server-side admin verification
-        await functions.createExecution(functionId, JSON.stringify({ adminEmail: userEmail }), false)
-      } else {
-        // Fallback: delete all documents from all tables
-        await resetDatabaseDirect()
+      if (!functionId || functionId.startsWith('your-')) {
+        throw new Error('Reset function is not configured')
       }
+      await functions.createExecution(functionId, '{}', false)
 
       setStep('success')
       onResetComplete()
@@ -56,62 +51,6 @@ export default function ResetModal({ isOpen, onClose, isAdmin, userEmail, onRese
       setStep('confirm')
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const resetDatabaseDirect = async () => {
-    const db = databases
-    if (!db) return
-
-    const tables = [
-      APPWRITE_CONFIG.tables.events,
-      APPWRITE_CONFIG.tables.claims,
-      APPWRITE_CONFIG.tables.beacons,
-      APPWRITE_CONFIG.tables.supplies,
-    ]
-
-    for (const tableId of tables) {
-      try {
-        const limit = 100
-        while (true) {
-          const response = await db.listDocuments(
-            APPWRITE_CONFIG.databaseId,
-            tableId,
-            [Query.limit(limit)]
-          )
-          if (response.documents.length === 0) break
-
-          await Promise.all(
-            response.documents.map(doc =>
-              db.deleteDocument(APPWRITE_CONFIG.databaseId, tableId, doc.$id)
-            )
-          )
-
-          if (response.documents.length < limit) break
-        }
-      } catch {
-        // Table might be empty or not exist, continue
-      }
-    }
-
-    // Re-initialize default supplies
-    const defaultSupplies = [
-      { itemId: 'boats', name: 'boats', quantity: 3 },
-      { itemId: 'medical_kits', name: 'medical_kits', quantity: 10 },
-      { itemId: 'food_packs', name: 'food_packs', quantity: 50 },
-    ]
-
-    for (const supply of defaultSupplies) {
-      try {
-        await db.createDocument(
-          APPWRITE_CONFIG.databaseId,
-          APPWRITE_CONFIG.tables.supplies,
-          `SUP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-          { ...supply, updatedAt: new Date().toISOString() }
-        )
-      } catch {
-        // Ignore
-      }
     }
   }
 

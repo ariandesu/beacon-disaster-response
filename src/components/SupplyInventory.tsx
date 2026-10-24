@@ -160,7 +160,8 @@ export default function SupplyInventory({ isAdmin }: SupplyInventoryProps) {
               isAdmin={isAdmin}
             />
           )
-        })}\n      </div>
+        })}
+      </div>
 
       {!isAdmin && (
         <p className="text-sm text-gray-500 text-center mt-4">

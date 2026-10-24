@@ -49,8 +49,7 @@ export default function Command() {
   useEffect(() => {
     if (user) {
       const adminEmails = ['admin@beacon.local', 'command@beacon.local']
-      const isAdminUser = adminEmails.includes(user.email?.toLowerCase() ?? '')
-      setIsAdmin(isAdminUser)
+      setIsAdmin(adminEmails.includes(user.email?.toLowerCase() ?? ''))
     } else {
       setIsAdmin(false)
     }
@@ -328,7 +327,6 @@ export default function Command() {
         isOpen={showReset}
         onClose={() => setShowReset(false)}
         isAdmin={isAdmin}
-        userEmail={user?.email ?? null}
         onResetComplete={handleResetComplete}
       />
       <LoginModal
