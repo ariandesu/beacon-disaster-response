@@ -88,7 +88,7 @@ export function useClaim(userId: string | null): UseClaimResult {
 
       const execution = await functions.createExecution(
         functionId,
-        JSON.stringify({ beaconId, responderId: userId }),
+        JSON.stringify({ beaconId }),
         false
       )
       const result = JSON.parse(execution.responseBody)
