@@ -65,7 +65,7 @@ npm run lint
 | `VITE_APPWRITE_FUNCTION_CLAIM_ID` | Claim function ID |
 | `VITE_APPWRITE_FUNCTION_RESET_ID` | Reset function ID |
 | `VITE_APPWRITE_FUNCTION_RESOLVE_ID` | Resolve function ID |
-| `APPWRITE_ADMIN_EMAILS` | Comma-separated admin emails for privileged ops |
+| `ADMIN_EMAILS` | Comma-separated admin emails for privileged ops (Functions only) |
 
 ## Security Notes
 

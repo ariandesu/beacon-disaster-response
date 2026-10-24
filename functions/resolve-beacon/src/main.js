@@ -1,4 +1,4 @@
-import { Client, Databases, Account, Query } from 'node-appwrite';
+import { Client, Databases, Users, Query } from 'node-appwrite';
 
 export default async ({ req, res, log, error }) => {
   const client = new Client()
@@ -7,7 +7,7 @@ export default async ({ req, res, log, error }) => {
     .setKey(process.env.APPWRITE_API_KEY);
 
   const databases = new Databases(client);
-  const account = new Account(client);
+  const users = new Users(client);
 
   let body = {};
   try {
@@ -30,7 +30,7 @@ export default async ({ req, res, log, error }) => {
   // against ADMIN_EMAILS which contains email addresses, not user IDs.
   let callerEmail = '';
   try {
-    const user = await account.get(callerId);
+    const user = await users.get(callerId);
     callerEmail = (user.email || '').toString().trim().toLowerCase();
   } catch (err) {
     // If we cannot look up the user, deny access rather than guess.

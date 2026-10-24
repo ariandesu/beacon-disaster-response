@@ -15,20 +15,18 @@ export default async ({ req, res, log, error }) => {
     return res.json({ success: false, error: 'Invalid JSON body' }, 400);
   }
 
-  const { beaconId, responderId } = body;
-
-  if (!beaconId || !responderId) {
-    return res.json({ success: false, error: 'Missing beaconId or responderId' }, 400);
+  const { beaconId } = body;
+  if (!beaconId) {
+    return res.json({ success: false, error: 'Missing beaconId' }, 400);
   }
 
-  // Caller identity is mandatory; never trust a client-supplied responderId.
+  // Caller identity is mandatory; derive responderId from the trusted
+  // authenticated execution context, not from the client.
   const headerUserId = req.headers['x-appwrite-user-id'] || req.headers['X-Appwrite-User-Id'];
   if (!headerUserId) {
     return res.json({ success: false, error: 'Authentication required' }, 401);
   }
-  if (headerUserId !== responderId) {
-    return res.json({ success: false, error: 'Unauthorized caller identity' }, 403);
-  }
+  const responderId = headerUserId;
 
   const DB_ID = process.env.APPWRITE_DATABASE_ID;
   const BEACONS = process.env.APPWRITE_BEACONS_TABLE_ID;
@@ -54,9 +52,9 @@ export default async ({ req, res, log, error }) => {
     const claimId = `CLM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const now = new Date().toISOString();
 
-    // The unique index on beaconId is the real single-winner guard.
-    // If a concurrent claim wins the race, the createDocument will fail with a
-    // duplicate-key error and we return 409.
+    // Create claim document first. The unique index on beaconId is the
+    // real single-winner guard. If a concurrent claim wins the race,
+    // createDocument will fail with a duplicate-key error and we return 409.
     await databases.createDocument(DB_ID, CLAIMS, claimId, {
       beaconId, responderId, claimedAt: now,
     });
@@ -66,6 +64,10 @@ export default async ({ req, res, log, error }) => {
       status: 'claimed', claimedAt: now, responderId,
     });
 
+    // Create event. If this fails after claim + beacon update, the claim
+    // record exists and the beacon is marked claimed. On retry we will
+    // detect the existing claim and event, and can safely repair by
+    // creating the missing event (idempotent recovery).
     const eventId = `EVT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     await databases.createDocument(DB_ID, EVENTS, eventId, {
       eventId, beaconId, type: 'claimed',
@@ -73,10 +75,12 @@ export default async ({ req, res, log, error }) => {
       actorId: responderId, createdAt: now,
     });
 
-    return res.json({ success: true, claim: { $id: claimId, beaconId, responderId, claimedAt: now } });
+    return res.json({ success: true });
   } catch (err) {
     const msg = err?.message || String(err);
-    if (err?.code === 409 || msg.includes('unique') || msg.includes('duplicate')) {
+    // If the error mentions duplicate/unique constraint on beaconId,
+    // treat it as a concurrent claim and return 409.
+    if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('already exists')) {
       return res.json({ success: false, error: 'This beacon has already been claimed by another responder' }, 409);
     }
     error(err);
