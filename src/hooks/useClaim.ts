@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { functions, databases, APPWRITE_CONFIG } from '../lib/appwrite'
-import { getClaimsQueries, generateEventId, nowISO } from '../lib/queries'
-import type { Beacon, Claim } from '../types/database'
+import { getClaimsQueries } from '../lib/queries'
+import type { Claim } from '../types/database'
 
 export interface UseClaimResult {
   claimBeacon: (_beaconId: string) => Promise<{ success: boolean; claim?: Claim; error?: string }>
@@ -73,48 +73,29 @@ export function useClaim(userId: string | null): UseClaimResult {
 
   const resolveBeacon = useCallback(async (beaconId: string) => {
     if (!userId) return { success: false, error: 'Not authenticated' }
-    if (!databases || !APPWRITE_CONFIG.isConfigured) return { success: false, error: 'Appwrite not configured' }
+    if (!functions || !APPWRITE_CONFIG.isConfigured) return { success: false, error: 'Appwrite not configured' }
 
     setIsLoading(true)
     setError(null)
 
     try {
-      const db = databases
-      if (!db) return { success: false, error: 'Appwrite not configured' }
-      const beaconDoc = await db.getDocument(
-        APPWRITE_CONFIG.databaseId,
-        APPWRITE_CONFIG.tables.beacons,
-        beaconId
-      ) as unknown as Beacon
-
-      if (beaconDoc.responderId !== userId) {
-        return { success: false, error: 'Only the assigned responder can resolve this beacon' }
-      }
-      if (beaconDoc.status === 'resolved') {
-        return { success: false, error: 'Beacon is already resolved' }
+      const functionId = import.meta.env.VITE_APPWRITE_FUNCTION_RESOLVE_ID
+      if (!functionId || functionId.startsWith('your-')) {
+        const message = 'Resolve function is not configured'
+        setError(message)
+        return { success: false, error: message }
       }
 
-      const timestamp = nowISO()
-      await db.updateDocument(
-        APPWRITE_CONFIG.databaseId,
-        APPWRITE_CONFIG.tables.beacons,
-        beaconId,
-        { status: 'resolved', resolvedAt: timestamp }
+      const execution = await functions.createExecution(
+        functionId,
+        JSON.stringify({ beaconId, responderId: userId }),
+        false
       )
-      const eventId = generateEventId()
-      await db.createDocument(
-        APPWRITE_CONFIG.databaseId,
-        APPWRITE_CONFIG.tables.events,
-        eventId,
-        {
-          eventId,
-          beaconId,
-          type: 'resolved',
-          message: `Responder ${userId} resolved this beacon`,
-          actorId: userId,
-          createdAt: timestamp,
-        }
-      )
+      const result = JSON.parse(execution.responseBody)
+      if (!result.success) {
+        setError(result.error || 'Resolve failed')
+        return { success: false, error: result.error || 'Resolve failed' }
+      }
       return { success: true }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Resolve failed'
