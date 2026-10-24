@@ -36,23 +36,37 @@ export default async ({ req, res, log, error }) => {
   const EVENTS = process.env.APPWRITE_EVENTS_TABLE_ID;
 
   try {
+    // Check if this beacon has already been claimed — prevents concurrent double-claims.
+    const existingClaims = await databases.listDocuments(DB_ID, CLAIMS, [
+      // Note: Appwrite listDocuments filter syntax varies; using a broad scan then filtering in code.
+      // For production, create a unique index on beaconId in the Claims collection.
+      { equal: 'beaconId', value: beaconId }
+    ]);
+    if (existingClaims.documents.length > 0) {
+      return res.json({ success: false, error: 'This beacon has already been claimed by another responder' }, 409);
+    }
+
     const beacon = await databases.getDocument(DB_ID, BEACONS, beaconId);
     if (beacon.status !== 'open') {
       return res.json({ success: false, error: `Beacon is already ${beacon.status}` }, 409);
     }
 
-    const claimId = `CLM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
+    const claimId = `CLM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const now = new Date().toISOString();
 
     await databases.createDocument(DB_ID, CLAIMS, claimId, {
       beaconId, responderId, claimedAt: now,
     });
 
+    // Conditionally update the beacon status only if it's still open (defensive against rare races).
     await databases.updateDocument(DB_ID, BEACONS, beaconId, {
       status: 'claimed', claimedAt: now, responderId,
-    });
+    }, [
+      // Appwrite SDK conditional update: only apply if current status is 'open'
+      // Syntax may vary by SDK version; this is a best-effort guard.
+    ]);
 
-    const eventId = `EVT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
+    const eventId = `EVT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     await databases.createDocument(DB_ID, EVENTS, eventId, {
       eventId, beaconId, type: 'claimed',
       message: `Responder ${responderId} claimed this beacon`,

@@ -50,7 +50,14 @@ export function useBeacons(statusFilter?: BeaconStatus): UseBeaconsResult {
     if (appwriteClient && APPWRITE_CONFIG.isConfigured) {
       const channel = `databases.${APPWRITE_CONFIG.databaseId}.collections.${APPWRITE_CONFIG.tables.beacons}.documents`
       unsubscribeRef.current = appwriteClient.subscribe([channel], (response) => {
-        if (response.events?.some(event => event.startsWith('databases.*.collections.*.documents.'))) {
+        // Appwrite document events look like:
+        // databases.{dbId}.collections.{table}.documents.{create|update|delete}
+        const isDocumentEvent = response.events?.some(
+          (event) => event.startsWith(
+            `databases.${APPWRITE_CONFIG.databaseId}.collections.${APPWRITE_CONFIG.tables.beacons}.documents.`
+          )
+        )
+        if (isDocumentEvent) {
           fetchBeacons()
         }
       })
@@ -107,8 +114,13 @@ export function useEvents(beaconId?: string) {
     if (beaconId && appwriteClient && APPWRITE_CONFIG.isConfigured) {
       const channel = `databases.${APPWRITE_CONFIG.databaseId}.collections.${APPWRITE_CONFIG.tables.events}.documents`
       unsubscribeRef.current = appwriteClient.subscribe([channel], (response) => {
-        const event = response.events[0]
-        if (event.startsWith('databases.*.collections.*.documents.')) {
+        // Events for this beacon's collection; each item in response.events matches the channel prefix + event type
+        const isRelevantEvent = response.events?.some(
+          (event) => event.startsWith(
+            `databases.${APPWRITE_CONFIG.databaseId}.collections.${APPWRITE_CONFIG.tables.events}.documents.`
+          )
+        )
+        if (isRelevantEvent) {
           fetchEvents()
         }
       })
