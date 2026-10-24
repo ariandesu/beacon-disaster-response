@@ -1,4 +1,4 @@
-import { Client, Databases } from 'node-appwrite';
+import { Client, Databases, Query } from 'node-appwrite';
 
 export default async ({ req, res, log, error }) => {
   const client = new Client()
@@ -37,10 +37,10 @@ export default async ({ req, res, log, error }) => {
 
   try {
     // Check if this beacon has already been claimed — prevents concurrent double-claims.
+    // The unique index on beaconId in the Claims collection is the real guard;
+    // this read-before-write check is a fast-path rejection.
     const existingClaims = await databases.listDocuments(DB_ID, CLAIMS, [
-      // Note: Appwrite listDocuments filter syntax varies; using a broad scan then filtering in code.
-      // For production, create a unique index on beaconId in the Claims collection.
-      { equal: 'beaconId', value: beaconId }
+      Query.equal('beaconId', beaconId)
     ]);
     if (existingClaims.documents.length > 0) {
       return res.json({ success: false, error: 'This beacon has already been claimed by another responder' }, 409);
@@ -54,17 +54,17 @@ export default async ({ req, res, log, error }) => {
     const claimId = `CLM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const now = new Date().toISOString();
 
+    // The unique index on beaconId is the real single-winner guard.
+    // If a concurrent claim wins the race, the createDocument will fail with a
+    // duplicate-key error and we return 409.
     await databases.createDocument(DB_ID, CLAIMS, claimId, {
       beaconId, responderId, claimedAt: now,
     });
 
-    // Conditionally update the beacon status only if it's still open (defensive against rare races).
+    // Update beacon status.
     await databases.updateDocument(DB_ID, BEACONS, beaconId, {
       status: 'claimed', claimedAt: now, responderId,
-    }, [
-      // Appwrite SDK conditional update: only apply if current status is 'open'
-      // Syntax may vary by SDK version; this is a best-effort guard.
-    ]);
+    });
 
     const eventId = `EVT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     await databases.createDocument(DB_ID, EVENTS, eventId, {

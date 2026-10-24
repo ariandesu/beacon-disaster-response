@@ -1,4 +1,4 @@
-import { Client, Databases } from 'node-appwrite';
+import { Client, Databases, Account, Query } from 'node-appwrite';
 
 export default async ({ req, res, log, error }) => {
   const client = new Client()
@@ -7,6 +7,7 @@ export default async ({ req, res, log, error }) => {
     .setKey(process.env.APPWRITE_API_KEY);
 
   const databases = new Databases(client);
+  const account = new Account(client);
 
   let body = {};
   try {
@@ -25,42 +26,69 @@ export default async ({ req, res, log, error }) => {
     return res.json({ success: false, error: 'Authentication required' }, 401);
   }
 
+  // Fetch the authenticated user's email server-side so we can compare
+  // against ADMIN_EMAILS which contains email addresses, not user IDs.
+  let callerEmail = '';
+  try {
+    const user = await account.get(callerId);
+    callerEmail = (user.email || '').toString().trim().toLowerCase();
+  } catch (err) {
+    // If we cannot look up the user, deny access rather than guess.
+    return res.json({ success: false, error: 'Failed to authenticate caller' }, 401);
+  }
+
+  const adminEmails = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+
+  const isAdmin = adminEmails.includes(callerEmail);
+
   const DB_ID = process.env.APPWRITE_DATABASE_ID;
   const BEACONS = process.env.APPWRITE_BEACONS_TABLE_ID;
   const CLAIMS = process.env.APPWRITE_CLAIMS_TABLE_ID;
   const EVENTS = process.env.APPWRITE_EVENTS_TABLE_ID;
 
   try {
-    // Load the beacon and verify it belongs to this caller.
     const beacon = await databases.getDocument(DB_ID, BEACONS, beaconId);
 
-    if (beacon.status === 'resolved') {
-      return res.json({ success: false, error: 'Beacon is already resolved' }, 409);
-    }
-
-    // Only the assigned responder may resolve; admins bypass via ADMIN_EMAILS.
-    const adminEmails = (process.env.ADMIN_EMAILS || '')
-      .split(',')
-      .map(e => e.trim().toLowerCase())
-      .filter(Boolean);
-
-    // We cannot fetch the user's email here without an Account client, so we rely on
-    // the caller identity header + the beacon's responderId match, plus optional admin emails.
+    // Authorization: only the assigned responder may resolve; admins bypass.
     const isAssignedResponder = beacon.responderId === callerId;
-    const isAdmin = adminEmails.includes(callerId);
-
     if (!isAssignedResponder && !isAdmin) {
       return res.json({ success: false, error: 'Only the assigned responder or an admin can resolve this beacon' }, 403);
     }
 
+    // Check for an existing resolution event — supports idempotent retries
+    // and recovery from partial failures (beacon resolved but event missing).
+    const resolutionEvents = await databases.listDocuments(DB_ID, EVENTS, [
+      Query.equal('beaconId', beaconId),
+      Query.equal('type', 'resolved')
+    ]);
+
+    if (resolutionEvents.documents.length > 0) {
+      return res.json({ success: true });
+    }
+
+    if (beacon.status === 'resolved') {
+      // Beacon is already resolved but no resolution event was found —
+      // recover by creating the missing event (partial failure from a prior run).
+      const now = new Date().toISOString();
+      const eventId = `EVT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      await databases.createDocument(DB_ID, EVENTS, eventId, {
+        eventId, beaconId, type: 'resolved',
+        message: `Responder ${callerId} resolved this beacon`,
+        actorId: callerId, createdAt: now,
+      });
+      return res.json({ success: true });
+    }
+
+    // Beacon is open: update status and create the resolution event.
     const now = new Date().toISOString();
 
-    // Update beacon status atomically.
     await databases.updateDocument(DB_ID, BEACONS, beaconId, {
       status: 'resolved', resolvedAt: now,
     });
 
-    // Create the resolution event.
     const eventId = `EVT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     await databases.createDocument(DB_ID, EVENTS, eventId, {
       eventId, beaconId, type: 'resolved',
