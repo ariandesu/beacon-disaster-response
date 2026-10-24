@@ -37,11 +37,16 @@ export default function ResetModal({ isOpen, onClose, isAdmin, onResetComplete }
     setIsLoading(true)
 
     try {
-      const functionId = import.meta.env.VITE_APPWRITE_FUNCTION_RESET_ID
-      if (!functionId || functionId.startsWith('your-')) {
-        throw new Error('Reset function is not configured')
+      const execution = await functions.createExecution(
+        APPWRITE_CONFIG.functions.reset,
+        '{}',
+        false
+      )
+      const result = JSON.parse(execution.responseBody || '{}')
+      if (!result.success) {
+        const detail = result.step ? ` (${result.step})` : ''
+        throw new Error(`${result.error || 'Reset failed'}${detail}`)
       }
-      await functions.createExecution(functionId, '{}', false)
 
       setStep('success')
       onResetComplete()
@@ -88,7 +93,7 @@ export default function ResetModal({ isOpen, onClose, isAdmin, onResetComplete }
           <>
             <div className="mb-6 p-4 bg-red-900/30 border border-red-500/30 rounded-lg">
               <p className="text-red-300 text-sm mb-2">
-                <strong>Warning:</strong> This will permanently delete all incidents, claims, events, and reset supplies to defaults.
+                <strong>Warning:</strong> This permanently deletes all incidents, claims, and events, then restores the seeded demo dataset and supplies.
               </p>
               <p className="text-red-400 text-sm">This action cannot be undone.</p>
             </div>

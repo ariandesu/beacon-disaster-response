@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_APPWRITE_SUPPLIES_TABLE_ID: string
   readonly VITE_APPWRITE_FUNCTION_CLAIM_ID: string
   readonly VITE_APPWRITE_FUNCTION_RESET_ID: string
+  readonly VITE_APPWRITE_FUNCTION_RESOLVE_ID: string
+  readonly VITE_APPWRITE_FUNCTION_UPDATE_SUPPLY_ID: string
   readonly VITE_MAP_DEFAULT_LAT: string
   readonly VITE_MAP_DEFAULT_LNG: string
   readonly VITE_MAP_DEFAULT_ZOOM: string

@@ -10,13 +10,21 @@ export interface UseBeaconsResult {
   refetch: () => Promise<void>
 }
 
-export function useBeacons(statusFilter?: BeaconStatus): UseBeaconsResult {
+export function useBeacons(statusFilter?: BeaconStatus, enabled = true): UseBeaconsResult {
   const [beacons, setBeacons] = useState<Beacon[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
+  const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchBeacons = useCallback(async () => {
+    if (!enabled) {
+      setBeacons([])
+      setError(null)
+      setIsLoading(false)
+      return
+    }
+
     if (!databases || !APPWRITE_CONFIG.isConfigured) {
       setError('Appwrite not configured')
       setIsLoading(false)
@@ -41,9 +49,16 @@ export function useBeacons(statusFilter?: BeaconStatus): UseBeaconsResult {
     } finally {
       setIsLoading(false)
     }
-  }, [statusFilter])
+  }, [statusFilter, enabled])
 
   useEffect(() => {
+    if (!enabled) {
+      setBeacons([])
+      setError(null)
+      setIsLoading(false)
+      return
+    }
+
     fetchBeacons()
 
     // Subscribe to realtime updates
@@ -58,18 +73,27 @@ export function useBeacons(statusFilter?: BeaconStatus): UseBeaconsResult {
           )
         )
         if (isDocumentEvent) {
-          fetchBeacons()
+          // Coalesce bursts of realtime events into one refetch.
+          if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current)
+          refetchTimerRef.current = setTimeout(() => {
+            refetchTimerRef.current = null
+            fetchBeacons()
+          }, 150)
         }
       })
     }
 
     return () => {
+      if (refetchTimerRef.current) {
+        clearTimeout(refetchTimerRef.current)
+        refetchTimerRef.current = null
+      }
       if (unsubscribeRef.current) {
         unsubscribeRef.current()
         unsubscribeRef.current = null
       }
     }
-  }, [fetchBeacons])
+  }, [fetchBeacons, enabled])
 
   return { beacons, isLoading, error, refetch: fetchBeacons }
 }

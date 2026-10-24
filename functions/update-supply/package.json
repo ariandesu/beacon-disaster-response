@@ -1,0 +1,12 @@
+{
+  "name": "update-supply",
+  "version": "1.0.0",
+  "main": "src/main.js",
+  "type": "module",
+  "dependencies": {
+    "node-appwrite": "^14.0.0"
+  },
+  "scripts": {
+    "start": "node src/main.js"
+  }
+}

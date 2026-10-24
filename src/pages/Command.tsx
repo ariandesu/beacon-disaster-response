@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useBeacons } from '../hooks/useBeacons'
 import { useSupplies } from '../hooks/useSupplies'
@@ -6,7 +6,7 @@ import IncidentMap from '../components/IncidentMap'
 import EventTimeline from '../components/EventTimeline'
 import SupplyInventory from '../components/SupplyInventory'
 import ResetModal from '../components/ResetModal'
-import LoginModal from '../components/LoginModal'
+import AuthGate from '../components/AuthGate'
 import type { Beacon, BeaconStatus } from '../types/database'
 
 const STATUS_CONFIG: Record<BeaconStatus, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
@@ -36,24 +36,19 @@ const STATUS_CONFIG: Record<BeaconStatus, { label: string; color: string; bg: st
 const SEVERITY_ORDER: Record<Beacon['severity'], number> = { critical: 0, high: 1, medium: 2, low: 3 }
 
 export default function Command() {
-  const { user, isAuthenticated, isLoading: authLoading, refresh } = useAuth()
-  const { beacons, isLoading: beaconsLoading, error: beaconsError, refetch: refetchBeacons } = useBeacons()
-  const { refetch: refetchSupplies } = useSupplies()
+  const { user, isAuthenticated, isLoading: authLoading, logout, refresh } = useAuth()
+  const { beacons, isLoading: beaconsLoading, error: beaconsError, refetch: refetchBeacons } = useBeacons(
+    undefined,
+    isAuthenticated
+  )
+  const { refetch: refetchSupplies } = useSupplies(isAuthenticated)
 
   const [selectedBeaconId, setSelectedBeaconId] = useState<string | null>(null)
   const [showReset, setShowReset] = useState(false)
-  const [showLogin, setShowLogin] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
 
-  // Check if user is admin
-  useEffect(() => {
-    if (user) {
-      const adminEmails = ['admin@beacon.local', 'command@beacon.local']
-      setIsAdmin(adminEmails.includes(user.email?.toLowerCase() ?? ''))
-    } else {
-      setIsAdmin(false)
-    }
-  }, [user])
+  // Roles come from Appwrite user labels (server-managed), never from a
+  // hardcoded email list in the browser bundle.
+  const isAdmin = Boolean(user?.labels?.includes('admin'))
 
   const counts = useMemo(() => beacons.reduce(
     (acc, b) => { acc[b.status]++; return acc },
@@ -71,11 +66,37 @@ export default function Command() {
     refresh()
   }, [refetchBeacons, refetchSupplies, refresh])
 
-  const handleLoginSuccess = useCallback(() => {
-    refresh()
-  }, [refresh])
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout()
+    } catch {
+      // useAuth exposes the error in state; the gate will be shown again.
+    }
+  }, [logout])
 
-  if (authLoading || beaconsLoading) {
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-beacon-dark flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-beacon-red border-t-transparent" aria-label="Loading" />
+          <p className="text-gray-400 text-sm">Verifying operator session...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <AuthGate
+        variant="dark"
+        title="Command access"
+        description="Sign in to open the incident operations center. Every authenticated operator can view live incidents; supply edits and demo resets require an account with the admin label."
+        onLoginSuccess={refresh}
+      />
+    )
+  }
+
+  if (beaconsLoading) {
     return (
       <div className="min-h-screen bg-beacon-dark flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -124,29 +145,23 @@ export default function Command() {
             </div>
 
             {/* Right: User + Admin */}
-            <div className="flex items-center gap-4">
-              {isAuthenticated ? (
-                <div className="flex items-center gap-3">
-                  <div className="hidden lg:block text-right">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">OPERATOR</p>
-                    <p className="text-sm font-medium text-white truncate max-w-xs">{user?.name || user?.email || user?.$id}</p>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700">
-                    <span className="text-lg font-bold text-beacon-red">{user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}</span>
-                  </div>
-                  {isAdmin && (
-                    <span className="px-2 py-1 text-xs font-bold bg-red-500/20 text-red-400 rounded border border-red-500/30 uppercase tracking-wider">ADMIN</span>
-                  )}
-                </div>
-              ) : (
-                              <button
-                                onClick={() => setShowLogin(true)}
-                                className="px-4 py-2 bg-beacon-red text-white font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-beacon-red focus:ring-offset-2 focus:ring-offset-beacon-dark transition-all text-sm"
-                              >
-                                <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                                SIGN IN
-                              </button>
-                            )}
+            <div className="flex items-center gap-3">
+              <div className="hidden lg:block text-right">
+                <p className="text-xs text-gray-500 uppercase tracking-wider">OPERATOR</p>
+                <p className="text-sm font-medium text-white truncate max-w-xs">{user?.name || user?.email || user?.$id}</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700">
+                <span className="text-lg font-bold text-beacon-red">{user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}</span>
+              </div>
+              {isAdmin && (
+                <span className="px-2 py-1 text-xs font-bold bg-red-500/20 text-red-400 rounded border border-red-500/30 uppercase tracking-wider">ADMIN</span>
+              )}
+              <button
+                onClick={() => { void handleLogout() }}
+                className="px-3 py-2 text-xs font-medium text-gray-400 border border-gray-700 rounded-lg hover:text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-beacon-red focus:ring-offset-2 focus:ring-offset-beacon-dark transition-colors"
+              >
+                SIGN OUT
+              </button>
             </div>
           </div>
         </div>
@@ -305,13 +320,6 @@ export default function Command() {
                 </div>
               )}
 
-              {!isAuthenticated && (
-                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 text-center">
-                  <svg className="w-14 h-14 mx-auto mb-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                  <h3 className="text-lg font-medium text-gray-300 mb-2">AUTHORIZATION REQUIRED</h3>
-                  <p className="text-sm text-gray-500 mb-4">Sign in with admin credentials to access supply management and system reset.</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -328,11 +336,6 @@ export default function Command() {
         onClose={() => setShowReset(false)}
         isAdmin={isAdmin}
         onResetComplete={handleResetComplete}
-      />
-      <LoginModal
-        isOpen={showLogin}
-        onClose={() => setShowLogin(false)}
-        onLoginSuccess={handleLoginSuccess}
       />
     </div>
   )

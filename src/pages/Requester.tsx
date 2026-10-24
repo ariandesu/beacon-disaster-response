@@ -47,7 +47,7 @@ export default function Requester() {
     severity: string
     locationLabel: string
   }) => {
-    const beacon = await createBeacon({
+    await createBeacon({
       latitude: data.latitude,
       longitude: data.longitude,
       category: data.category as Beacon['category'],
@@ -55,11 +55,7 @@ export default function Requester() {
       locationLabel: data.locationLabel,
     })
     setShowSuccess(true)
-    // Navigate to responder page with beacon ID after a short delay
-    setTimeout(() => {
-      navigate(`/respond?beacon=${beacon.beaconId}`)
-    }, 3000)
-  }, [createBeacon, navigate])
+  }, [createBeacon])
 
   const handleCreateAnother = useCallback(() => {
     setShowSuccess(false)
@@ -80,7 +76,7 @@ export default function Requester() {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Beacon Created</h1>
-          <p className="text-gray-600 mb-6">Your emergency beacon has been activated and responders have been notified.</p>
+          <p className="text-gray-600 mb-6">Your emergency beacon is live on the responder map. Nearby volunteers can now see it and claim the response.</p>
 
           <div className="p-4 bg-gray-50 rounded-lg text-left space-y-2 mb-6">
             <div className="flex justify-between">
@@ -133,8 +129,8 @@ export default function Requester() {
       <header className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Request Emergency Help</h1>
         <p className="text-gray-600">
-          Create a beacon to alert nearby volunteer responders. Your location and incident details
-          will be shared with verified volunteers in the area.
+          Create a beacon to alert nearby responders. Your location and incident details appear on
+          the live incident map so volunteers can find you.
         </p>
       </header>
 

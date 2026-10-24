@@ -1,5 +1,476 @@
 {
   "projectId": "6adbc115002fbf8e703b",
   "endpoint": "https://sgp.cloud.appwrite.io/v1",
-  "organizationId": ""
+  "organizationId": "",
+  "databases": [
+    {
+      "$id": "6adbc21b001e95337577",
+      "name": "beacon-db",
+      "enabled": true
+    }
+  ],
+  "collections": [
+    {
+      "$id": "beacons",
+      "$permissions": [
+        "read(\"any\")",
+        "create(\"any\")"
+      ],
+      "databaseId": "6adbc21b001e95337577",
+      "name": "Beacons",
+      "enabled": true,
+      "documentSecurity": false,
+      "attributes": [
+        {
+          "key": "beaconId",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "createdAt",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "latitude",
+          "type": "double",
+          "required": true,
+          "array": false,
+          "default": null,
+          "min": -1.7976931348623157e+308,
+          "max": 1.7976931348623157e+308
+        },
+        {
+          "key": "longitude",
+          "type": "double",
+          "required": true,
+          "array": false,
+          "default": null,
+          "min": -1.7976931348623157e+308,
+          "max": 1.7976931348623157e+308
+        },
+        {
+          "key": "claimedAt",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "resolvedAt",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "responderId",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "locationLabel",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 256,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "category",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 20,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "severity",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 10,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "status",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 10,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_status",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "status"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_category",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "category"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_severity",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "severity"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_created_at",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "createdAt"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "claims",
+      "$permissions": [
+        "read(\"users\")"
+      ],
+      "databaseId": "6adbc21b001e95337577",
+      "name": "Claims",
+      "enabled": true,
+      "documentSecurity": false,
+      "attributes": [
+        {
+          "key": "beaconId",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "responderId",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "claimedAt",
+          "type": "datetime",
+          "required": true,
+          "array": false,
+          "default": null,
+          "format": ""
+        }
+      ],
+      "indexes": [
+        {
+          "key": "unique_beacon_id",
+          "type": "unique",
+          "status": "available",
+          "attributes": [
+            "beaconId"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_responder_id",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "responderId"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_claimed_at",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "claimedAt"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "events",
+      "$permissions": [
+        "read(\"users\")"
+      ],
+      "databaseId": "6adbc21b001e95337577",
+      "name": "Events",
+      "enabled": true,
+      "documentSecurity": false,
+      "attributes": [
+        {
+          "key": "eventId",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "beaconId",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "message",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 512,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "actorId",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "createdAt",
+          "type": "datetime",
+          "required": true,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "type",
+          "type": "string",
+          "required": true,
+          "array": false,
+          "size": 12,
+          "default": null,
+          "encrypt": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_beacon_id",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "beaconId"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_type",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "type"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_actor_id",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "actorId"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_created_at",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "createdAt"
+          ],
+          "orders": [
+            "DESC"
+          ]
+        }
+      ]
+    },
+    {
+      "$id": "supplies",
+      "$permissions": [
+        "read(\"users\")"
+      ],
+      "databaseId": "6adbc21b001e95337577",
+      "name": "Supplies",
+      "enabled": true,
+      "documentSecurity": false,
+      "attributes": [
+        {
+          "key": "itemId",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 64,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "required": false,
+          "array": false,
+          "size": 128,
+          "default": null,
+          "encrypt": false
+        },
+        {
+          "key": "updatedAt",
+          "type": "datetime",
+          "required": false,
+          "array": false,
+          "default": null,
+          "format": ""
+        },
+        {
+          "key": "quantity",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "default": null,
+          "min": 0,
+          "max": 9223372036854775807
+        }
+      ],
+      "indexes": [
+        {
+          "key": "unique_item_id",
+          "type": "unique",
+          "status": "available",
+          "attributes": [
+            "itemId"
+          ],
+          "orders": []
+        },
+        {
+          "key": "idx_name",
+          "type": "key",
+          "status": "available",
+          "attributes": [
+            "name"
+          ],
+          "orders": [
+            "ASC"
+          ]
+        }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "$id": "claim-beacon",
+      "name": "Beacon Operations",
+      "runtime": "node-18.0",
+      "path": "functions/claim-beacon",
+      "previewDomainTarget": "region",
+      "previewDomainLabel": "starter-function-gzcz",
+      "entrypoint": "src/main.js",
+      "execute": [
+        "any"
+      ],
+      "enabled": true,
+      "logging": true,
+      "events": [],
+      "schedule": "",
+      "interval": 0,
+      "timeout": 15,
+      "commands": "",
+      "scopes": [
+        "databases.read",
+        "databases.write",
+        "users.read"
+      ],
+      "installationId": "",
+      "providerRepositoryId": "",
+      "providerBranch": "",
+      "providerSilentMode": false,
+      "providerRootDirectory": "",
+      "providerBranches": [],
+      "providerPaths": [],
+      "buildSpecification": "s-2vcpu-2gb",
+      "runtimeSpecification": "s-0.5vcpu-512mb",
+      "deploymentRetention": 0
+    },
+    {
+      "$id": "reset-demo",
+      "name": "Reset Demo Data",
+      "runtime": "node-18.0",
+      "path": "functions/reset-demo",
+      "previewDomainTarget": "region",
+      "previewDomainLabel": "starter-function-xeha",
+      "entrypoint": "src/main.js",
+      "execute": [
+        "any"
+      ],
+      "enabled": true,
+      "logging": true,
+      "events": [],
+      "schedule": "",
+      "interval": 0,
+      "timeout": 15,
+      "commands": "",
+      "scopes": [
+        "databases.read",
+        "databases.write",
+        "users.read"
+      ],
+      "installationId": "",
+      "providerRepositoryId": "",
+      "providerBranch": "",
+      "providerSilentMode": false,
+      "providerRootDirectory": "",
+      "providerBranches": [],
+      "providerPaths": [],
+      "buildSpecification": "s-2vcpu-2gb",
+      "runtimeSpecification": "s-0.5vcpu-512mb",
+      "deploymentRetention": 0
+    }
+  ]
 }

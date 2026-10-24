@@ -44,16 +44,9 @@ export function useClaim(userId: string | null): UseClaimResult {
     setError(null)
 
     try {
-      const functionId = import.meta.env.VITE_APPWRITE_FUNCTION_CLAIM_ID
-      if (!functionId || functionId.startsWith('your-')) {
-        const message = 'Claim function is not configured'
-        setError(message)
-        return { success: false, error: message }
-      }
-
       const execution = await functions.createExecution(
-        functionId,
-        JSON.stringify({ beaconId }),
+        APPWRITE_CONFIG.functions.claim,
+        JSON.stringify({ action: 'claim', beaconId }),
         false
       )
       const result = JSON.parse(execution.responseBody)
@@ -79,16 +72,9 @@ export function useClaim(userId: string | null): UseClaimResult {
     setError(null)
 
     try {
-      const functionId = import.meta.env.VITE_APPWRITE_FUNCTION_RESOLVE_ID
-      if (!functionId || functionId.startsWith('your-')) {
-        const message = 'Resolve function is not configured'
-        setError(message)
-        return { success: false, error: message }
-      }
-
       const execution = await functions.createExecution(
-        functionId,
-        JSON.stringify({ beaconId }),
+        APPWRITE_CONFIG.functions.resolve,
+        JSON.stringify({ action: 'resolve', beaconId }),
         false
       )
       const result = JSON.parse(execution.responseBody)
